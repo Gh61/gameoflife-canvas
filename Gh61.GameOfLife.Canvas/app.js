@@ -1,12 +1,59 @@
 class GameOfLife {
     constructor(canvas) {
-        this.isPaused = false;
+        this.isPaused = 0;
+        // #region Clicks
+        this.mouseIsClicking = false;
+        this.isLiveSetting = false;
         this.canvas = canvas;
     }
+    registerClicks() {
+        this.canvas.addEventListener("mousedown", ev => this.mouseDown(ev));
+        this.canvas.addEventListener("mousemove", ev => this.mouseMove(ev));
+        this.canvas.addEventListener("mouseup", ev => this.mouseUp(ev));
+    }
+    mouseDown(ev) {
+        this.mouseIsClicking = true;
+        this.isPaused = GameOfLife.pauseTime;
+        this.isLiveSetting = this.toggleCellLive(ev);
+        this.renderCurrentState(false);
+    }
+    mouseMove(ev) {
+        if (this.mouseIsClicking) {
+            this.isPaused = GameOfLife.pauseTime;
+            this.toggleCellLive(ev, this.isLiveSetting);
+            this.renderCurrentState(false);
+        }
+    }
+    mouseUp(ev) {
+        this.isPaused = GameOfLife.pauseTime;
+        this.mouseIsClicking = false;
+    }
+    /**
+     * Will toggle the state of the cell under the cursor.
+     * @param ev Mouse event after click, move
+     * @param setLive If the cell might be set Live/Dead or toggled(null)
+     * @returns The state wich was set to
+     */
+    toggleCellLive(ev, setLive) {
+        const x = Math.floor(ev.clientX / GameOfLife.completeSize);
+        const y = Math.floor(ev.clientY / GameOfLife.completeSize);
+        const cell = this.currentState[x][y];
+        if (setLive == null) {
+            cell.isLive = !cell.isLive;
+        }
+        else {
+            cell.isLive = setLive;
+        }
+        return cell.isLive; // returning if cell was set to live
+    }
+    // #endregion
+    // #region Game engine
     /**
      * Will start the Game of life
      */
     start() {
+        // clicks support
+        this.registerClicks();
         this.setCanvasSize();
         // init states
         this.initializeStates();
@@ -41,8 +88,8 @@ class GameOfLife {
             // vertical lines
             for (let x = GameOfLife.size; x < this.canvas.width; x += GameOfLife.completeSize) {
                 context.beginPath();
-                context.moveTo(x, 0.5); // y needs .5 fix, for pixel perfect drawing
-                context.lineTo(x, this.canvas.height + .5);
+                context.moveTo(x + .5, 0.5); // y needs .5 fix, for pixel perfect drawing
+                context.lineTo(x + .5, this.canvas.height + .5);
                 context.lineWidth = GameOfLife.borderSize;
                 context.strokeStyle = GameOfLife.borderColor;
                 context.stroke();
@@ -64,7 +111,7 @@ class GameOfLife {
     initializeStates() {
         this.maxX = Math.ceil(this.canvas.width / GameOfLife.completeSize);
         this.maxY = Math.ceil(this.canvas.height / GameOfLife.completeSize);
-        //TODO: preserve currentState
+        //TODO: preserve currentState (when resizin - resize event)
         this.lastState = this.createNewState(true);
         this.currentState = this.createNewState(true);
     }
@@ -73,8 +120,11 @@ class GameOfLife {
      */
     game() {
         // when paused
-        if (this.isPaused)
+        if (this.isPaused > 0) {
+            // waiting to unpause
+            this.isPaused--;
             return;
+        }
         // transform
         this.transformToNewState();
         // render
@@ -159,13 +209,14 @@ class GameOfLife {
     }
 }
 // #### Settings
-GameOfLife.size = 5;
+GameOfLife.size = 10;
 GameOfLife.borderSize = 1;
 GameOfLife.completeSize = GameOfLife.size + GameOfLife.borderSize;
-GameOfLife.borderColor = "#049372";
-GameOfLife.deadColor = "#fff";
-GameOfLife.liveColor = "#5B8930";
-GameOfLife.fps = 4;
+GameOfLife.borderColor = "#111";
+GameOfLife.deadColor = "black";
+GameOfLife.liveColor = "red";
+GameOfLife.fps = 10;
+GameOfLife.pauseTime = GameOfLife.fps * 2; // 3s
 class CellOfLife {
     constructor(isLive = false) {
         this.isLive = isLive;
@@ -185,10 +236,6 @@ class CellOfLife {
             if (liveNeighbours === 3) {
                 nextIsLive = true;
             }
-        }
-        // if is state same is this, returning this
-        if (nextIsLive === this.isLive) {
-            return this;
         }
         return new CellOfLife(nextIsLive);
     }

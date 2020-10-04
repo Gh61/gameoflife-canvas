@@ -1,12 +1,13 @@
 ﻿class GameOfLife {
 	// #### Settings
-	private static readonly size: number = 5;
+	private static readonly size: number = 10;
 	private static readonly borderSize: number = 1;
-	private static readonly completeSize: number = GameOfLife.size + GameOfLife.borderSize;
-	private static readonly borderColor: string = "#049372";
-	private static readonly deadColor: string = "#fff";
-	private static readonly liveColor: string = "#5B8930";
-	private static readonly fps: number = 4;
+	private static readonly completeSize = GameOfLife.size + GameOfLife.borderSize;
+	private static readonly borderColor: string = "#111";
+	private static readonly deadColor: string = "black";
+	private static readonly liveColor: string = "red";
+	private static readonly fps: number = 10;
+	private static readonly pauseTime = GameOfLife.fps * 2; // 3s
 
 	// #### Private
 	private readonly canvas: HTMLCanvasElement;
@@ -14,14 +15,65 @@
 	private currentState: CellOfLife[][];
 	private maxX: number;
 	private maxY: number;
-	private isPaused: boolean = false;
+	private isPaused: number = 0;
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.canvas = canvas;
-
-
 	}
 
+	// #region Clicks
+
+	private mouseIsClicking: boolean = false;
+	private isLiveSetting: boolean = false;
+
+	private registerClicks() {
+		this.canvas.addEventListener("mousedown", ev => this.mouseDown(ev));
+		this.canvas.addEventListener("mousemove", ev => this.mouseMove(ev));
+		this.canvas.addEventListener("mouseup", ev => this.mouseUp(ev));
+	}
+
+	private mouseDown(ev: MouseEvent) {
+		this.mouseIsClicking = true;
+		this.isPaused = GameOfLife.pauseTime;
+		this.isLiveSetting = this.toggleCellLive(ev);
+		this.renderCurrentState(false);
+	}
+
+	private mouseMove(ev: MouseEvent) {
+		if (this.mouseIsClicking) {
+			this.isPaused = GameOfLife.pauseTime;
+			this.toggleCellLive(ev, this.isLiveSetting);
+			this.renderCurrentState(false);
+		}
+	}
+
+	private mouseUp(ev: MouseEvent) {
+		this.isPaused = GameOfLife.pauseTime;
+		this.mouseIsClicking = false;
+	}
+
+	/**
+	 * Will toggle the state of the cell under the cursor.
+	 * @param ev Mouse event after click, move
+	 * @param setLive If the cell might be set Live/Dead or toggled(null)
+	 * @returns The state wich was set to
+	 */
+	private toggleCellLive(ev: MouseEvent, setLive?: boolean): boolean {
+		const x = Math.floor(ev.clientX / GameOfLife.completeSize);
+		const y = Math.floor(ev.clientY / GameOfLife.completeSize);
+
+		const cell = this.currentState[x][y];
+
+		if (setLive == null) {
+			cell.isLive = !cell.isLive;
+		} else {
+			cell.isLive = setLive;
+		}
+
+		return cell.isLive; // returning if cell was set to live
+	}
+
+	// #endregion
 
 	// #region Game engine
 
@@ -29,6 +81,9 @@
 	 * Will start the Game of life
 	 */
 	start() {
+		// clicks support
+		this.registerClicks();
+
 		this.setCanvasSize();
 
 		// init states
@@ -73,8 +128,8 @@
 			// vertical lines
 			for (let x = GameOfLife.size; x < this.canvas.width; x += GameOfLife.completeSize) {
 				context.beginPath();
-				context.moveTo(x, 0.5); // y needs .5 fix, for pixel perfect drawing
-				context.lineTo(x, this.canvas.height + .5);
+				context.moveTo(x + .5, 0.5); // y needs .5 fix, for pixel perfect drawing
+				context.lineTo(x + .5, this.canvas.height + .5);
 				context.lineWidth = GameOfLife.borderSize;
 				context.strokeStyle = GameOfLife.borderColor;
 				context.stroke();
@@ -110,8 +165,11 @@
 	 */
 	private game() {
 		// when paused
-		if (this.isPaused)
+		if (this.isPaused > 0) {
+			// waiting to unpause
+			this.isPaused--;
 			return;
+		}
 
 		// transform
 		this.transformToNewState();
@@ -212,7 +270,7 @@
 }
 
 class CellOfLife {
-	readonly isLive: boolean;
+	isLive: boolean;
 
 	constructor(isLive: boolean = false) {
 		this.isLive = isLive;
@@ -232,11 +290,6 @@ class CellOfLife {
 			if (liveNeighbours === 3) {
 				nextIsLive = true;
 			}
-		}
-
-		// if is state same is this, returning this
-		if (nextIsLive === this.isLive) {
-			return this;
 		}
 
 		return new CellOfLife(nextIsLive);
