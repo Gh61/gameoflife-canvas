@@ -1,1 +1,1 @@
-﻿*{margin:0;padding:0;border:0;}body,html{height:100%;overflow:hidden;}body>*:first-child{margin-top:0;}#settings{height:50px;background-color:#8b0000;}#gc{cursor:pointer;}
+﻿*{margin:0;padding:0;border:0;}body,html{height:100%;overflow:hidden;}body>*:first-child{margin-top:0;}#settings{height:50px;background-color:#8b0000;}#gc{cursor:pointer;}.settings-row{float:left;width:230px;height:20px;margin:2px 4px 2px 4px;}.settings-row label{width:130px;}.settings-row input{width:100px;max-width:100px;}

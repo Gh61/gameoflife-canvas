@@ -18,3 +18,16 @@ body > *:first-child {
 #gc {
   cursor: pointer;
 }
+.settings-row {
+  float: left;
+  width: 230px;
+  height: 20px;
+  margin: 2px 4px 2px 4px;
+}
+.settings-row label {
+  width: 130px;
+}
+.settings-row input {
+  width: 100px;
+  max-width: 100px;
+}

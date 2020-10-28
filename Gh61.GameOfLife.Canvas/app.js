@@ -3,9 +3,9 @@ class SettingsViewModel {
         this.cellSize = kox.intObservable(10);
         this.borderSize = kox.intObservable(1);
         this.completeSize = ko.computed(() => this.cellSize() + this.borderSize());
-        this.borderColor = ko.observable("#111");
-        this.deadColor = ko.observable("black");
-        this.liveColor = ko.observable("red");
+        this.borderColor = ko.observable("#111111");
+        this.deadColor = ko.observable("#000000");
+        this.liveColor = ko.observable("#ff0000");
         this.speed = ko.observable(10);
         this.pauseTime = ko.computed(() => this.speed() * 2);
     }
@@ -23,6 +23,16 @@ class GameOfLife {
     hookSettingsChanges(settings) {
         settings.completeSize.subscribe(() => {
             this.drawGrid();
+            this.renderCurrentState(false);
+        });
+        settings.borderColor.subscribe(() => {
+            this.drawGrid();
+            this.renderCurrentState(false);
+        });
+        settings.deadColor.subscribe(() => {
+            this.renderCurrentState(false);
+        });
+        settings.liveColor.subscribe(() => {
             this.renderCurrentState(false);
         });
     }
