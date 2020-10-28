@@ -1,13 +1,19 @@
-﻿class GameOfLife {
+﻿///<reference path="node_modules/knockout/build/types/knockout.d.ts"/>
+
+class SettingsViewModel {
+	cellSize = kox.intObservable(10);
+	borderSize = kox.intObservable(1);
+	completeSize = ko.computed(() => this.cellSize() + this.borderSize());
+	borderColor = ko.observable("#111");
+	deadColor = ko.observable("black");
+	liveColor = ko.observable("red");
+	speed = ko.observable(10);
+	pauseTime = ko.computed(() => this.speed() * 2); // 2s
+}
+
+class GameOfLife {
 	// #### Settings
-	private static readonly size: number = 10;
-	private static readonly borderSize: number = 1;
-	private static readonly completeSize = GameOfLife.size + GameOfLife.borderSize;
-	private static readonly borderColor: string = "#111";
-	private static readonly deadColor: string = "black";
-	private static readonly liveColor: string = "red";
-	private static readonly fps: number = 10;
-	private static readonly pauseTime = GameOfLife.fps * 2; // 3s
+	readonly settings: SettingsViewModel;
 
 	// #### Private
 	private readonly canvas: HTMLCanvasElement;
@@ -16,10 +22,28 @@
 	private maxX: number;
 	private maxY: number;
 	private isPaused: number = 0;
+	private settingsHeight: number = 0;
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.canvas = canvas;
+		this.settings = new SettingsViewModel();
+
+		this.hookSettingsChanges(this.settings);
 	}
+
+	// #region Settings change
+
+	private hookSettingsChanges(settings: SettingsViewModel) {
+		// change of cellsize/bordersize means re-render whole grid with cells
+		settings.completeSize.subscribe(() => {
+			this.drawGrid();
+			this.renderCurrentState(false);
+		});
+
+
+	}
+
+	// #endregion
 
 	// #region Clicks
 
@@ -34,21 +58,21 @@
 
 	private mouseDown(ev: MouseEvent) {
 		this.mouseIsClicking = true;
-		this.isPaused = GameOfLife.pauseTime;
+		this.isPaused = this.settings.pauseTime();
 		this.isLiveSetting = this.toggleCellLive(ev);
 		this.renderCurrentState(false);
 	}
 
 	private mouseMove(ev: MouseEvent) {
 		if (this.mouseIsClicking) {
-			this.isPaused = GameOfLife.pauseTime;
+			this.isPaused = this.settings.pauseTime();
 			this.toggleCellLive(ev, this.isLiveSetting);
 			this.renderCurrentState(false);
 		}
 	}
 
 	private mouseUp(ev: MouseEvent) {
-		this.isPaused = GameOfLife.pauseTime;
+		this.isPaused = this.settings.pauseTime();
 		this.mouseIsClicking = false;
 	}
 
@@ -59,8 +83,8 @@
 	 * @returns The state wich was set to
 	 */
 	private toggleCellLive(ev: MouseEvent, setLive?: boolean): boolean {
-		const x = Math.floor(ev.clientX / GameOfLife.completeSize);
-		const y = Math.floor(ev.clientY / GameOfLife.completeSize);
+		const x = Math.floor(ev.clientX / this.settings.completeSize());
+		const y = Math.floor((ev.clientY - this.settingsHeight) / this.settings.completeSize());
 
 		const cell = this.currentState[x][y];
 
@@ -101,15 +125,20 @@
 		this.renderCurrentState(false);
 
 		// start game loop
-		setInterval(() => this.game(), 1000 / GameOfLife.fps);
+		setInterval(() => this.game(), 1000 / this.settings.speed());
 	}
 
 	/**
 	 * Resizes cavas to full size of window
 	 */
 	private setCanvasSize() {
+		var settings = document.getElementById("settings");
+		if (settings) {
+			this.settingsHeight = settings.clientHeight;
+		}
+
 		this.canvas.width = document.body.clientWidth;
-		this.canvas.height = document.body.clientHeight;
+		this.canvas.height = document.body.clientHeight - this.settingsHeight;
 	}
 
 	/**
@@ -122,27 +151,18 @@
 		// clearing the canvas
 		context.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-		// drawing grid only if needed
-		if (GameOfLife.borderSize > 0) {
+		// drawing grid only if needed - using rectangles (lines are not perfectly aligned)
+		if (this.settings.borderSize() > 0) {
+			context.fillStyle = this.settings.borderColor();
 
 			// vertical lines
-			for (let x = GameOfLife.size; x < this.canvas.width; x += GameOfLife.completeSize) {
-				context.beginPath();
-				context.moveTo(x + .5, 0.5); // y needs .5 fix, for pixel perfect drawing
-				context.lineTo(x + .5, this.canvas.height + .5);
-				context.lineWidth = GameOfLife.borderSize;
-				context.strokeStyle = GameOfLife.borderColor;
-				context.stroke();
+			for (let x = this.settings.cellSize(); x < this.canvas.width; x += this.settings.completeSize()) {
+				context.fillRect(x, 0, this.settings.borderSize(), this.canvas.height);
 			}
 
 			// horizontal lines
-			for (let y = GameOfLife.size; y < this.canvas.height; y += GameOfLife.completeSize) {
-				context.beginPath();
-				context.moveTo(0, y + .5);
-				context.lineTo(this.canvas.width, y + .5);
-				context.lineWidth = GameOfLife.borderSize;
-				context.strokeStyle = GameOfLife.borderColor;
-				context.stroke();
+			for (let y = this.settings.cellSize(); y < this.canvas.height; y += this.settings.completeSize()) {
+				context.fillRect(0, y, this.canvas.width, this.settings.borderSize());
 			}
 		}
 	}
@@ -151,8 +171,8 @@
 	 * Initializes arrays of cells (lastState and currentState) depending on size of canvas.
 	 */
 	private initializeStates() {
-		this.maxX = Math.ceil(this.canvas.width / GameOfLife.completeSize);
-		this.maxY = Math.ceil(this.canvas.height / GameOfLife.completeSize);
+		this.maxX = Math.ceil(this.canvas.width / this.settings.completeSize());
+		this.maxY = Math.ceil(this.canvas.height / this.settings.completeSize());
 
 		//TODO: preserve currentState (when resizin - resize event)
 
@@ -237,17 +257,17 @@
 				}
 
 				// compute position
-				const posX = x * GameOfLife.completeSize;
-				const posY = y * GameOfLife.completeSize;
+				const posX = x * this.settings.completeSize();
+				const posY = y * this.settings.completeSize();
 
 				// render to the right context
 				if (this.currentState[x][y].isLive) {
-					ctx.fillStyle = GameOfLife.liveColor;
+					ctx.fillStyle = this.settings.liveColor();
 				} else {
-					ctx.fillStyle = GameOfLife.deadColor;
+					ctx.fillStyle = this.settings.deadColor();
 				}
 
-				ctx.fillRect(posX, posY, GameOfLife.size, GameOfLife.size);
+				ctx.fillRect(posX, posY, this.settings.cellSize(), this.settings.cellSize());
 			}
 		}
 	}
@@ -296,9 +316,10 @@ class CellOfLife {
 	}
 }
 
-
 window.onload = () => {
 	var canvas = document.getElementById("gc");
 	var gol = new GameOfLife(canvas as HTMLCanvasElement);
 	gol.start();
+
+	ko.applyBindings(gol.settings, document.getElementById("settings"));
 };

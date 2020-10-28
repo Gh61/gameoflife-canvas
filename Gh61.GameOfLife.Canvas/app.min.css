@@ -1,1 +1,1 @@
-﻿*{margin:0;padding:0;border:0;}body,html{height:100%;}#gc{cursor:pointer;}
+﻿*{margin:0;padding:0;border:0;}body,html{height:100%;overflow:hidden;}body>*:first-child{margin-top:0;}#settings{height:50px;background-color:#8b0000;}#gc{cursor:pointer;}

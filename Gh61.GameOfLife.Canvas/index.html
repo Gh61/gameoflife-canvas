@@ -2,12 +2,26 @@
 
 <html lang="en">
 <head>
-    <meta charset="utf-8" />
-    <title>Game of Life</title>
-    <link rel="stylesheet" href="app.min.css" type="text/css" />
-    <script src="app.js"></script>
+	<meta charset="utf-8" />
+	<title>Game of Life</title>
+	<link rel="stylesheet" href="app.min.css" type="text/css" />
+	<script src="node_modules/knockout/build/output/knockout-latest.js"></script>
+	<script src="scripts/utils.js"></script>
+	<script src="app.js"></script>
 </head>
 <body>
-	<canvas id="gc"></canvas>
+	<div id="settings">
+		<div class="settings-row">
+			<label for="cellSize">Cell size:</label>
+			<input type="range" id="cellSize" min="1" step="1" max="50" data-bind="value:cellSize" />
+		</div>
+		<div class="settings-row">
+			<label for="borderSize">Border size:</label>
+			<input type="range" id="borderSize" min="1" step="1" max="10" data-bind="value:borderSize" />
+		</div>
+	</div>
+<canvas id="gc"></canvas>
 </body>
+
+
 </html>

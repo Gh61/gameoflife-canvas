@@ -1,10 +1,30 @@
+class SettingsViewModel {
+    constructor() {
+        this.cellSize = kox.intObservable(10);
+        this.borderSize = kox.intObservable(1);
+        this.completeSize = ko.computed(() => this.cellSize() + this.borderSize());
+        this.borderColor = ko.observable("#111");
+        this.deadColor = ko.observable("black");
+        this.liveColor = ko.observable("red");
+        this.speed = ko.observable(10);
+        this.pauseTime = ko.computed(() => this.speed() * 2);
+    }
+}
 class GameOfLife {
     constructor(canvas) {
         this.isPaused = 0;
-        // #region Clicks
+        this.settingsHeight = 0;
         this.mouseIsClicking = false;
         this.isLiveSetting = false;
         this.canvas = canvas;
+        this.settings = new SettingsViewModel();
+        this.hookSettingsChanges(this.settings);
+    }
+    hookSettingsChanges(settings) {
+        settings.completeSize.subscribe(() => {
+            this.drawGrid();
+            this.renderCurrentState(false);
+        });
     }
     registerClicks() {
         this.canvas.addEventListener("mousedown", ev => this.mouseDown(ev));
@@ -13,30 +33,24 @@ class GameOfLife {
     }
     mouseDown(ev) {
         this.mouseIsClicking = true;
-        this.isPaused = GameOfLife.pauseTime;
+        this.isPaused = this.settings.pauseTime();
         this.isLiveSetting = this.toggleCellLive(ev);
         this.renderCurrentState(false);
     }
     mouseMove(ev) {
         if (this.mouseIsClicking) {
-            this.isPaused = GameOfLife.pauseTime;
+            this.isPaused = this.settings.pauseTime();
             this.toggleCellLive(ev, this.isLiveSetting);
             this.renderCurrentState(false);
         }
     }
     mouseUp(ev) {
-        this.isPaused = GameOfLife.pauseTime;
+        this.isPaused = this.settings.pauseTime();
         this.mouseIsClicking = false;
     }
-    /**
-     * Will toggle the state of the cell under the cursor.
-     * @param ev Mouse event after click, move
-     * @param setLive If the cell might be set Live/Dead or toggled(null)
-     * @returns The state wich was set to
-     */
     toggleCellLive(ev, setLive) {
-        const x = Math.floor(ev.clientX / GameOfLife.completeSize);
-        const y = Math.floor(ev.clientY / GameOfLife.completeSize);
+        const x = Math.floor(ev.clientX / this.settings.completeSize());
+        const y = Math.floor((ev.clientY - this.settingsHeight) / this.settings.completeSize());
         const cell = this.currentState[x][y];
         if (setLive == null) {
             cell.isLive = !cell.isLive;
@@ -44,105 +58,62 @@ class GameOfLife {
         else {
             cell.isLive = setLive;
         }
-        return cell.isLive; // returning if cell was set to live
+        return cell.isLive;
     }
-    // #endregion
-    // #region Game engine
-    /**
-     * Will start the Game of life
-     */
     start() {
-        // clicks support
         this.registerClicks();
         this.setCanvasSize();
-        // init states
         this.initializeStates();
-        // TEST: basic oscilator:
         this.currentState[2][1] = new CellOfLife(true);
         this.currentState[2][2] = new CellOfLife(true);
         this.currentState[2][3] = new CellOfLife(true);
-        // create grid
         this.drawGrid();
-        // startup full render
         this.renderCurrentState(false);
-        // start game loop
-        setInterval(() => this.game(), 1000 / GameOfLife.fps);
+        setInterval(() => this.game(), 1000 / this.settings.speed());
     }
-    /**
-     * Resizes cavas to full size of window
-     */
     setCanvasSize() {
+        var settings = document.getElementById("settings");
+        if (settings) {
+            this.settingsHeight = settings.clientHeight;
+        }
         this.canvas.width = document.body.clientWidth;
-        this.canvas.height = document.body.clientHeight;
+        this.canvas.height = document.body.clientHeight - this.settingsHeight;
     }
-    /**
-     * Will draw basic grid
-     */
     drawGrid() {
         const context = this.canvas.getContext("2d");
         context.imageSmoothingEnabled = false;
-        // clearing the canvas
         context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        // drawing grid only if needed
-        if (GameOfLife.borderSize > 0) {
-            // vertical lines
-            for (let x = GameOfLife.size; x < this.canvas.width; x += GameOfLife.completeSize) {
-                context.beginPath();
-                context.moveTo(x + .5, 0.5); // y needs .5 fix, for pixel perfect drawing
-                context.lineTo(x + .5, this.canvas.height + .5);
-                context.lineWidth = GameOfLife.borderSize;
-                context.strokeStyle = GameOfLife.borderColor;
-                context.stroke();
+        if (this.settings.borderSize() > 0) {
+            context.fillStyle = this.settings.borderColor();
+            for (let x = this.settings.cellSize(); x < this.canvas.width; x += this.settings.completeSize()) {
+                context.fillRect(x, 0, this.settings.borderSize(), this.canvas.height);
             }
-            // horizontal lines
-            for (let y = GameOfLife.size; y < this.canvas.height; y += GameOfLife.completeSize) {
-                context.beginPath();
-                context.moveTo(0, y + .5);
-                context.lineTo(this.canvas.width, y + .5);
-                context.lineWidth = GameOfLife.borderSize;
-                context.strokeStyle = GameOfLife.borderColor;
-                context.stroke();
+            for (let y = this.settings.cellSize(); y < this.canvas.height; y += this.settings.completeSize()) {
+                context.fillRect(0, y, this.canvas.width, this.settings.borderSize());
             }
         }
     }
-    /**
-     * Initializes arrays of cells (lastState and currentState) depending on size of canvas.
-     */
     initializeStates() {
-        this.maxX = Math.ceil(this.canvas.width / GameOfLife.completeSize);
-        this.maxY = Math.ceil(this.canvas.height / GameOfLife.completeSize);
-        //TODO: preserve currentState (when resizin - resize event)
+        this.maxX = Math.ceil(this.canvas.width / this.settings.completeSize());
+        this.maxY = Math.ceil(this.canvas.height / this.settings.completeSize());
         this.lastState = this.createNewState(true);
         this.currentState = this.createNewState(true);
     }
-    /**
-     * One step of gameLoop
-     */
     game() {
-        // when paused
         if (this.isPaused > 0) {
-            // waiting to unpause
             this.isPaused--;
             return;
         }
-        // transform
         this.transformToNewState();
-        // render
         this.renderCurrentState();
     }
-    /**
-     * create new state depending on currentState and rules.
-     */
     transformToNewState() {
         this.lastState = this.currentState;
         this.currentState = this.createNewState();
-        // deadCell - helper
         const deadCell = new CellOfLife();
         for (let x = 0; x < this.maxX; x++) {
             for (let y = 0; y < this.maxY; y++) {
-                // Getting neighbours
                 const neighbours = new Array();
-                // first row
                 if (y > 0) {
                     neighbours.push(x > 0 ? this.lastState[x - 1][y - 1] : deadCell);
                     neighbours.push(this.lastState[x][y - 1]);
@@ -153,10 +124,8 @@ class GameOfLife {
                     neighbours.push(deadCell);
                     neighbours.push(deadCell);
                 }
-                // middle row
                 neighbours.push(x > 0 ? this.lastState[x - 1][y] : deadCell);
                 neighbours.push(x < this.maxX - 1 ? this.lastState[x + 1][y] : deadCell);
-                // last row
                 if (y < this.maxY - 1) {
                     neighbours.push(x > 0 ? this.lastState[x - 1][y + 1] : deadCell);
                     neighbours.push(this.lastState[x][y + 1]);
@@ -167,38 +136,30 @@ class GameOfLife {
                     neighbours.push(deadCell);
                     neighbours.push(deadCell);
                 }
-                // setting new cell
                 this.currentState[x][y] = this.lastState[x][y].getNewState(neighbours);
             }
         }
     }
-    /**
-     * Renders currentState (only changes)
-     */
     renderCurrentState(onlyChanges = true) {
         const ctx = this.canvas.getContext("2d");
         ctx.imageSmoothingEnabled = false;
         for (let x = 0; x < this.maxX; x++) {
             for (let y = 0; y < this.maxY; y++) {
-                // if rendering only changes, then skip cells with same state
                 if (onlyChanges && this.lastState[x][y].isLive === this.currentState[x][y].isLive) {
                     continue;
                 }
-                // compute position
-                const posX = x * GameOfLife.completeSize;
-                const posY = y * GameOfLife.completeSize;
-                // render to the right context
+                const posX = x * this.settings.completeSize();
+                const posY = y * this.settings.completeSize();
                 if (this.currentState[x][y].isLive) {
-                    ctx.fillStyle = GameOfLife.liveColor;
+                    ctx.fillStyle = this.settings.liveColor();
                 }
                 else {
-                    ctx.fillStyle = GameOfLife.deadColor;
+                    ctx.fillStyle = this.settings.deadColor();
                 }
-                ctx.fillRect(posX, posY, GameOfLife.size, GameOfLife.size);
+                ctx.fillRect(posX, posY, this.settings.cellSize(), this.settings.cellSize());
             }
         }
     }
-    // #### UTILS:
     createNewState(init = false) {
         if (init) {
             return new Array(this.maxX).fill(null).map(() => new Array(this.maxY).fill(new CellOfLife()));
@@ -208,22 +169,10 @@ class GameOfLife {
         }
     }
 }
-// #### Settings
-GameOfLife.size = 10;
-GameOfLife.borderSize = 1;
-GameOfLife.completeSize = GameOfLife.size + GameOfLife.borderSize;
-GameOfLife.borderColor = "#111";
-GameOfLife.deadColor = "black";
-GameOfLife.liveColor = "red";
-GameOfLife.fps = 10;
-GameOfLife.pauseTime = GameOfLife.fps * 2; // 3s
 class CellOfLife {
     constructor(isLive = false) {
         this.isLive = isLive;
     }
-    /**
-     * Creates new state of this cell.
-     */
     getNewState(surroundingCells) {
         const liveNeighbours = surroundingCells.filter(c => c.isLive).length;
         let nextIsLive = this.isLive;
@@ -244,5 +193,6 @@ window.onload = () => {
     var canvas = document.getElementById("gc");
     var gol = new GameOfLife(canvas);
     gol.start();
+    ko.applyBindings(gol.settings, document.getElementById("settings"));
 };
 //# sourceMappingURL=app.js.map
