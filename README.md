@@ -4,4 +4,4 @@ Implementation of [Conway's Game of Life](https://en.wikipedia.org/wiki/Conway%2
 ![Video](life.gif)
 
 Working page:
-[Try me!](https://gh61.github.io/gameoflife-canvas/Gh61.GameOfLife.Canvas/index.html)
+[Try me!](https://gh61.github.io/gameoflife-canvas/Gh61.GameOfLife.Canvas/)
