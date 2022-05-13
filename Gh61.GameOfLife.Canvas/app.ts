@@ -1,4 +1,4 @@
-﻿///<reference path="node_modules/knockout/build/types/knockout.d.ts"/>
+﻿///<reference path="dependencies/knockout/build/types/knockout.d.ts"/>
 
 class SettingsViewModel {
 	cellSize = kox.intObservable(10);
